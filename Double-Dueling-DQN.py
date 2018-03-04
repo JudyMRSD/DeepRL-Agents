@@ -148,6 +148,8 @@ path = "./dqn" #The path to save our model to.
 h_size = 512 #The size of the final convolutional layer before splitting it into Advantage and Value streams.
 tau = 0.001 #Rate to update target network toward primary network
 
+print("hello")
+
 
 # In[ ]:
 
@@ -162,6 +164,22 @@ saver = tf.train.Saver()
 
 trainables = tf.trainable_variables()
 
+for i in range(len(trainables)):
+    print("i=",i," variable=",trainables[i].name)# trainable name Conv/weights:0
+'''
+i= 0  variable= Conv/weights:0
+i= 1  variable= Conv_1/weights:0
+i= 2  variable= Conv_2/weights:0
+i= 3  variable= Conv_3/weights:0
+i= 4  variable= Variable:0
+i= 5  variable= Variable_1:0
+i= 6  variable= Conv_4/weights:0
+i= 7  variable= Conv_5/weights:0
+i= 8  variable= Conv_6/weights:0
+i= 9  variable= Conv_7/weights:0
+i= 10  variable= Variable_2:0
+i= 11  variable= Variable_3:0
+'''
 targetOps = updateTargetGraph(trainables,tau)
 
 myBuffer = experience_buffer()
