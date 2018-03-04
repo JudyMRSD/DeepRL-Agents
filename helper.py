@@ -17,20 +17,18 @@ def updateTargetGraph(tfVars,tau):
     total_vars = len(tfVars)
     op_holder = []
     for idx,var in enumerate(tfVars[0:total_vars//2]):
-        print("idx", idx)
-        print("var name", var.name)
         op_holder.append(tfVars[idx+total_vars//2].assign((var.value()*tau) + ((1-tau)*tfVars[idx+total_vars//2].value())))
     return op_holder
 
 def updateTarget(op_holder,sess):
-    print("update target")
+    # print("update target")
     for op in op_holder:
         sess.run(op)
     total_vars = len(tf.trainable_variables())
     a = tf.trainable_variables()[0].eval(session=sess)
     b = tf.trainable_variables()[total_vars//2].eval(session=sess)
     if a.all() == b.all():
-        print("Target Set Success")
+        # print("Target Set Success")
     else:
         print("Target Set Failed")
         
@@ -50,8 +48,8 @@ def saveToCenter(i,rList,jList,bufferArray,summaryLength,h_size,sess,mainQN,time
         luminance = np.max(imagesS,3)
         imagesS = np.multiply(np.ones([len(imagesS),84,84,3]),np.reshape(luminance,[len(imagesS),84,84,1]))
         make_gif(np.ones([len(imagesS),84,84,3]),'./Center/frames/sal'+str(i)+'.gif',duration=len(imagesS)*time_per_step,true_image=False,salience=True,salIMGS=luminance)
-
-        images = zip(bufferArray[:,0])
+        images = list(zip(bufferArray[:,0]))
+        #images = zip(bufferArray[:,0])
         images.append(bufferArray[-1,3])
         images = np.vstack(images)
         images = np.resize(images,[len(images),84,84,3])
