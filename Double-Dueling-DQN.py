@@ -240,12 +240,10 @@ with tf.Session() as sess:
         if i % 1000 == 0:
             saver.save(sess,path+'/model-'+str(i)+'.ckpt')
             print("Saved Model")
-        if len(rList) % 100 == 0:
+        if len(rList) % 10== 0:
             print("total_steps",total_steps,"mean reward",np.mean(rList[-10:]), "epsilon", e)
-            print("sum(rList) ", sum(rList),"num_episodes", num_episodes) 
-            print("Percent of succesful episodes: " + str(sum(rList)/num_episodes) + "%")
     saver.save(sess,path+'/model-'+str(i)+'.ckpt')
-print("Percent of succesful episodes: " + str(sum(rList)/num_episodes) + "%")
+print("END of training, Percent of succesful episodes: " + str(sum(rList)/num_episodes) + "%")
 
 
 # ### Checking network learning
