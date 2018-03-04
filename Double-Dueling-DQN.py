@@ -163,10 +163,9 @@ init = tf.global_variables_initializer()
 saver = tf.train.Saver()
 
 trainables = tf.trainable_variables()
-
-for i in range(len(trainables)):
-    print("i=",i," variable=",trainables[i].name)# trainable name Conv/weights:0
 '''
+for i in range(len(trainables)):
+    print("i=",i," variable=",trainables[i].name)
 i= 0  variable= Conv/weights:0
 i= 1  variable= Conv_1/weights:0
 i= 2  variable= Conv_2/weights:0
@@ -203,8 +202,10 @@ with tf.Session() as sess:
         print('Loading Model...')
         ckpt = tf.train.get_checkpoint_state(path)
         saver.restore(sess,ckpt.model_checkpoint_path)
+    episodeBuffer = experience_buffer()
+    
     for i in range(num_episodes):
-        episodeBuffer = experience_buffer()
+        
         #Reset environment and get first new observation
         s = env.reset()
         s = processState(s)
