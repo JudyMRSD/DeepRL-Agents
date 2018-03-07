@@ -8,6 +8,38 @@ import csv
 import itertools
 import tensorflow.contrib.slim as slim
 
+
+def running_mean(x, N):
+    x = np.array(x)
+    # insert: Insert values 0 along the given axis before the given indices 0.
+    cumsum = np.cumsum(np.insert(x, 0, 0))
+    # print("cumsum[N:]",cumsum[N:])
+    # print("cumsum[:-N]",cumsum[:-N])
+    result = (cumsum[N:] - cumsum[:-N]) / N
+    # print("x",x.shape, "cumsum", result.shape)
+    return result
+
+
+def plot_running_mean(rewards_list, filename):
+    smoothed_rews = running_mean(rewards_list, 10)
+
+    eps = np.arange(len(rewards_list))
+    # print("smoothed_rews",smoothed_rews)
+    # print("eps[-len(smoothed_rews):]",eps[-len(smoothed_rews):])
+    # G_t
+    skipNums = len(smoothed_rews)
+    # print("skipNums", skipNums, "eps", eps.shape)
+    plt.plot(eps[-skipNums:], smoothed_rews)
+
+    # plt.plot(smoothed_rews)
+    # moving average of G_t
+    plt.plot(eps, rewards_list, color='grey', alpha=0.3)
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.savefig('./result/' + filename + '.jpg')
+
+
+
 #This is a simple function to reshape our game frames.
 def processState(state1):
     return np.reshape(state1,[21168])
@@ -27,9 +59,9 @@ def updateTarget(op_holder,sess):
     total_vars = len(tf.trainable_variables())
     a = tf.trainable_variables()[0].eval(session=sess)
     b = tf.trainable_variables()[total_vars//2].eval(session=sess)
-    if a.all() == b.all():
+    #if a.all() == b.all():
         # print("Target Set Success")
-    else:
+    if a.all() != b.all():
         print("Target Set Failed")
         
 #Record performance metrics and episode logs for the Control Center.

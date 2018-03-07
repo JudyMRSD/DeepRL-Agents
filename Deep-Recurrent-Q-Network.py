@@ -205,7 +205,9 @@ with tf.Session() as sess:
         ckpt = tf.train.get_checkpoint_state(path)
         saver.restore(sess,ckpt.model_checkpoint_path)
     sess.run(init)
-   
+    print("graph------")
+    writer = tf.summary.FileWriter("./log/drqn_train/", sess.graph)
+
     updateTarget(targetOps,sess) #Set the target network to be equal to the primary network.
     for i in range(num_episodes):
         episodeBuffer = []
@@ -271,6 +273,7 @@ with tf.Session() as sess:
             print ("total_steps",total_steps,"np.mean(rList[-summaryLength:]",np.mean(rList[-summaryLength:]), "epsilon=",e)
             saveToCenter(i,rList,jList,np.reshape(np.array(episodeBuffer),[len(episodeBuffer),5]),                summaryLength,h_size,sess,mainQN,time_per_step)
     saver.save(sess,path+'/model-'+str(i)+'.cptk')
+    writer.close()
 
 
 
@@ -319,6 +322,9 @@ with open('./Center/log.csv', 'w') as myfile:
     
     #wr = csv.writer(open('./Center/log.csv', 'a'), quoting=csv.QUOTE_ALL)
 with tf.Session() as sess:
+    print("graph------")
+    writer = tf.summary.FileWriter("./log/", sess.graph)
+
     if load_model == True:
         print ('Loading Model...')
         ckpt = tf.train.get_checkpoint_state(path)
@@ -326,7 +332,7 @@ with tf.Session() as sess:
     else:
         sess.run(init)
 
-        
+
     for i in range(num_episodes):
         episodeBuffer = []
         #Reset environment and get first new observation
@@ -367,4 +373,4 @@ with tf.Session() as sess:
             print (total_steps,np.mean(rList[-summaryLength:]), e)
             saveToCenter(i,rList,jList,np.reshape(np.array(episodeBuffer),[len(episodeBuffer),5]),                summaryLength,h_size,sess,mainQN,time_per_step)
 print ("Percent of succesful episodes: " + str(sum(rList)/num_episodes) + "%")
-
+writer.close()

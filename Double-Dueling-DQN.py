@@ -21,6 +21,8 @@ import tensorflow.contrib.slim as slim
 import matplotlib.pyplot as plt
 import scipy.misc
 import os
+from helper import *
+from keras import backend as K
 
 
 # ### Load the game environment
@@ -65,20 +67,36 @@ class Qnetwork():
         
         #Then combine them together to get our final Q-values.
         self.Qout = self.Value + tf.subtract(self.Advantage,tf.reduce_mean(self.Advantage,axis=1,keep_dims=True))
-        self.predict = tf.argmax(self.Qout,1)
-        
+        #print("Qout",tf.shape(self.Qout))# Q(s,a1), Q(s,a2), shape=(2,) 
+        self.predict = tf.argmax(self.Qout,1) # chosen action
+        print("predict",tf.shape(self.predict)) # shape=(1,)
+
+        self.maxQ = tf.reduce_max(tf.reduce_max(self.Qout, axis=1))
+        print("maxQ", tf.shape(self.maxQ))# shape=(1,)
+
         #Below we obtain the loss by taking the sum of squares difference between the target and prediction Q values.
-        self.targetQ = tf.placeholder(shape=[None],dtype=tf.float32)
-        self.actions = tf.placeholder(shape=[None],dtype=tf.int32)
-        self.actions_onehot = tf.one_hot(self.actions,env.actions,dtype=tf.float32)
-        
+        self.targetQ = tf.placeholder(shape=[None],dtype=tf.float32) # shape=(1,)
+        self.actions = tf.placeholder(shape=[None],dtype=tf.int32) # shape=(1,)
+        self.actions_onehot = tf.one_hot(self.actions,env.actions,dtype=tf.float32) # shape=(2,)
+        # print("targetQ, actions, onehot",tf.shape(self.targetQ), tf.shape(self.actions), tf.shape(self.actions_onehot ))
+        # "Shape:0", shape=(1,), dtype=int32) Tensor("Shape_1:0", shape=(1,), dtype=int32) Tensor("Shape_2:0", shape=(2,), dtype=int3
         self.Q = tf.reduce_sum(tf.multiply(self.Qout, self.actions_onehot), axis=1)
-        
+        # self.meanQ = tf.reduce_mean(self.Q)
+        # print("Q",tf.shape(self.Q)) # shape=(1,)    Q(s, a_i), a_i is the action encoded by actions_onehot, e.g. 01 is action a1, 10 is action a2
         self.td_error = tf.square(self.targetQ - self.Q)
         self.loss = tf.reduce_mean(self.td_error)
         self.trainer = tf.train.AdamOptimizer(learning_rate=0.0001)
         self.updateModel = self.trainer.minimize(self.loss)
+        # predicted q
+        self.q_s_a = tf.placeholder(tf.float32)
+        tf.summary.scalar('q_s_a', self.q_s_a)
 
+        # loss
+        tf.summary.scalar('loss', self.loss)
+        # reward
+        self.reward = tf.placeholder(tf.int32)
+        tf.summary.scalar('reward', self.reward)
+        self.merged = tf.summary.merge_all()
 
 # ### Experience Replay
 
@@ -204,6 +222,8 @@ with tf.Session() as sess:
         saver.restore(sess,ckpt.model_checkpoint_path)
     episodeBuffer = experience_buffer()
     
+    train_writer = tf.summary.FileWriter('../summary/DQN_dueling', sess.graph)
+
     for i in range(num_episodes):
         
         #Reset environment and get first new observation
@@ -218,6 +238,7 @@ with tf.Session() as sess:
             
             j+=1
             #Choose an action by greedily (with e chance of random action) from the Q-network
+            q_s_a = sess.run(mainQN.predict,feed_dict={mainQN.scalarInput:[s]})[0]
             if np.random.rand(1) < e or total_steps < pre_train_steps:
                 a = np.random.randint(0,4)
             else:
@@ -227,6 +248,8 @@ with tf.Session() as sess:
             total_steps += 1
             episodeBuffer.add(np.reshape(np.array([s,a,r,s1,d]),[1,5])) #Save the experience to our episode buffer.
             
+            rAll += r
+
             if total_steps > pre_train_steps:
                 if e > endE:
                     e -= stepDrop
@@ -234,18 +257,25 @@ with tf.Session() as sess:
                 if total_steps % (update_freq) == 0:
                     trainBatch = myBuffer.sample(batch_size) #Get a random batch of experiences.
                     #Below we perform the Double-DQN update to the target Q-values
-                    Q1 = sess.run(mainQN.predict,feed_dict={mainQN.scalarInput:np.vstack(trainBatch[:,3])})
+                    # trainBatch[:,3]: s'
+                    Q1 = sess.run(mainQN.predict, feed_dict={mainQN.scalarInput:np.vstack(trainBatch[:,3])})
+                    
                     Q2 = sess.run(targetQN.Qout,feed_dict={targetQN.scalarInput:np.vstack(trainBatch[:,3])})
                     #end_multiplier = 0 if it's the end state (done = 1)
                     # else,trainBatch[:,4]=0, -(0-1)=1 ,  end_multiplier = 1 
                     end_multiplier = -(trainBatch[:,4] - 1)
                     doubleQ = Q2[range(batch_size),Q1]
                     targetQ = trainBatch[:,2] + (y*doubleQ * end_multiplier)
+                    # s,a,r,s1,d
+                    # actions = trainBatch[:,1] 
                     #Update the network with our target values.
-                    _ = sess.run(mainQN.updateModel,                         feed_dict={mainQN.scalarInput:np.vstack(trainBatch[:,0]),mainQN.targetQ:targetQ, mainQN.actions:trainBatch[:,1]})
+                    _ = sess.run(mainQN.updateModel, feed_dict={mainQN.scalarInput:np.vstack(trainBatch[:,0]),mainQN.targetQ:targetQ, mainQN.actions:trainBatch[:,1]})
+                    # episodeReward = sess.run(mainQN.reward, feed_dict={mainQN.reward: rAll})
+                    summary = sess.run(mainQN.merged, feed_dict={mainQN.reward: rAll,mainQN.q_s_a:q_s_a, mainQN.targetQ:targetQ, mainQN.actions:trainBatch[:,1], mainQN.scalarInput:np.vstack(trainBatch[:,0]) })
                     
+                    train_writer.add_summary(summary, total_steps)
                     updateTarget(targetOps,sess) #Update the target network toward the primary network.
-            rAll += r
+            
             s = s1
             
             if d == True:
@@ -255,13 +285,19 @@ with tf.Session() as sess:
         myBuffer.add(episodeBuffer.buffer)
         jList.append(j)
         rList.append(rAll)
+
+        # summary = sess.run(self.mainQN.merged, feed_dict={duelDQN.reward: rAll}) 
         #Periodically save the model. 
         if i % 1000 == 0:
             saver.save(sess,path+'/model-'+str(i)+'.ckpt')
             print("Saved Model")
-        if len(rList) % 10== 0:
+        if len(rList) % 20== 0:
             print("total_steps",total_steps,"mean reward",np.mean(rList[-10:]), "epsilon", e)
+            #plot_running_mean(rList, "double-dueling")
     saver.save(sess,path+'/model-'+str(i)+'.ckpt')
+
+    train_writer.close()
+
 print("END of training, Percent of succesful episodes: " + str(sum(rList)/num_episodes) + "%")
 
 
