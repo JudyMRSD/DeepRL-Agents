@@ -90,6 +90,8 @@ class Qnetwork():
         # predicted q
         self.q_s_a = tf.placeholder(tf.float32)
         tf.summary.scalar('q_s_a', self.q_s_a)
+        # greedy prediction
+        tf.summary.scalar('maxQ', self.maxQ)
 
         # loss
         tf.summary.scalar('loss', self.loss)
@@ -222,7 +224,7 @@ with tf.Session() as sess:
         saver.restore(sess,ckpt.model_checkpoint_path)
     episodeBuffer = experience_buffer()
     
-    train_writer = tf.summary.FileWriter('../summary/DQN_dueling', sess.graph)
+    train_writer = tf.summary.FileWriter('./log', sess.graph)
 
     for i in range(num_episodes):
         
@@ -256,11 +258,16 @@ with tf.Session() as sess:
                 # skip frame to accelerate the training process
                 if total_steps % (update_freq) == 0:
                     trainBatch = myBuffer.sample(batch_size) #Get a random batch of experiences.
-                    #Below we perform the Double-DQN update to the target Q-values
+                    # Below we perform the Double-DQN update to the target Q-values
                     # trainBatch[:,3]: s'
                     Q1 = sess.run(mainQN.predict, feed_dict={mainQN.scalarInput:np.vstack(trainBatch[:,3])})
                     
                     Q2 = sess.run(targetQN.Qout,feed_dict={targetQN.scalarInput:np.vstack(trainBatch[:,3])})
+                    #for i in range (10):
+                    #    plt.imshow(np.reshape(trainBatch[i,3], [84,84,3]))
+                    #    plt.show()
+                    
+
                     #end_multiplier = 0 if it's the end state (done = 1)
                     # else,trainBatch[:,4]=0, -(0-1)=1 ,  end_multiplier = 1 
                     end_multiplier = -(trainBatch[:,4] - 1)
